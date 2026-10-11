@@ -1,0 +1,45 @@
+# 每次有檔案上傳到 main，就重新產生文章清單並發布到 GitHub Pages
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 掃描 data/reports/ 裡所有 .md 檔，寫成 data/index.json
+      - name: Build article index
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          files = sorted(f for f in os.listdir("data/reports") if f.lower().endswith(".md"))
+          with open("data/index.json", "w", encoding="utf-8") as fp:
+              json.dump(files, fp, ensure_ascii=False, indent=2)
+          print(files)
+          EOF
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
